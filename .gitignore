@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 utils.py*
+utils.key
 
 # C extensions
 *.so
