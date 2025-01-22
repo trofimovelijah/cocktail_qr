@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 utils.py*
 utils.key
+*.wav
 
 # C extensions
 *.so
