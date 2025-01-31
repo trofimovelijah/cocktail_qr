@@ -19,7 +19,7 @@ class RecipeFinder:
         )
         
         # Инициализация LLM
-        self.llm = Ollama(model="saiga_mistral_7b_gguf:Q8_0")
+        self.llm = Ollama(model="mistral:instruct")
 
     async def find_recipe(self, ingredients: list, style: str) -> str:
         # Формирование запроса
