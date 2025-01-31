@@ -1,0 +1,12 @@
+python-telegram-bot==21.10
+python-dotenv==1.0.1
+langchain>=0.1.0
+langchain-community>=0.0.28
+langchain-core>=0.1.31
+langchain-huggingface>=0.1.2
+faiss-cpu #==1.8.0
+sentence-transformers>=2.6.0
+torch==2.2.1
+torchaudio==2.2.1
+silero
+ollama>=0.1.8 

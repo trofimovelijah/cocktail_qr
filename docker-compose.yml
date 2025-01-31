@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./.env:/app/.env
+    env_file:
+      - .env
+    restart: always
+    init: true 
