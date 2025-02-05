@@ -19,8 +19,8 @@ class RecipeFinder:
         )
         
         # Инициализация LLM
-        self.llm = Ollama(model="mistral:instruct")
-
+        self.llm = Ollama(base_url="http://localhost:11434", model="mistral:instruct")
+    
     async def find_recipe(self, ingredients: list, style: str) -> str:
         # Формирование запроса
         ingredients_str = ", ".join(ingredients)
@@ -39,6 +39,11 @@ class RecipeFinder:
                 template='Перепиши текст в указанном стиле:\n{text}\nСтиль: {style}'
             )
             styled_prompt = prompt.format(text=recipe, style=style)
-            recipe = self.llm.invoke(styled_prompt)
+            
+            # Явное указание модели в запросе
+            try:
+                recipe = self.llm.invoke(styled_prompt, model="mistral:instruct")
+            except Exception as e:
+                print(f"Ошибка при вызове LLM: {e}")
         
-        return recipe 
+        return recipe

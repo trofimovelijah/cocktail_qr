@@ -31,7 +31,7 @@ class SpeechGenerator:
             )
             
             # Сохранение файла
-            output_dir = 'audio'
+            output_dir = '../audio'
             os.makedirs(output_dir, exist_ok=True)
             
             output_file = os.path.join(output_dir, f'output_{random.randint(1, 9999)}.wav')
