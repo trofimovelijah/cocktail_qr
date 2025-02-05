@@ -1,6 +1,6 @@
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.llms import Ollama
+from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 
 class RecipeFinder:
