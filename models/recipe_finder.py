@@ -13,7 +13,7 @@ class RecipeFinder:
         
         # Загрузка векторной базы
         self.db = FAISS.load_local(
-            "data/faiss_db_epub_mistral", 
+            "../data/faiss_db_epub_mistral", 
             self.embeddings,
             allow_dangerous_deserialization=True
         )
