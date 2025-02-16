@@ -27,7 +27,7 @@ class RecipeFinder:
         
         # Инициализация LLM с новыми параметрами
         self.llm = Ollama(
-            base_url="http://172.17.0.1:11434",
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434"),
             model="mistral:instruct",
             temperature=0.2,
             num_predict=512,

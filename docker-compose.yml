@@ -3,11 +3,32 @@ version: '3.8'
 services:
   bot:
     build: .
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - HUGGINGFACEHUB_API_TOKEN=${HUGGINGFACEHUB_API_TOKEN}
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434  # Подключение к Ollama на хост-машине
     volumes:
-      - ./models:/app/models
-      - ./data:/app/data
-      - ./.env:/app/.env
-    env_file:
-      - .env
-    restart: always
-    init: true 
+      - ./data:/app/data  # Монтирование векторной базы
+      - ./audio:/app/audio  # Монтирование директории для аудио
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # Для доступа к хост-машине из контейнера
+    depends_on:
+      - ollama
+    networks:
+      - cocktail-network
+
+  ollama:
+    image: ollama/ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/home/elijah/.ollama
+    networks:
+      - cocktail-network
+
+networks:
+  cocktail-network:
+    driver: bridge
+
+volumes:
+  ollama_data:
