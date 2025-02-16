@@ -2,169 +2,210 @@ import os
 import logging
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, filters
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    ConversationHandler,
+    filters,
+)
 from recipe_finder import RecipeFinder
 from speech_generator import SpeechGenerator
 
-# Загрузка переменных окружения
-load_dotenv()
-
 # Настройка логирования
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 
-# Состояния разговора
-INGREDIENT_INPUT, STYLE_CHOICE, GENERATION = range(3)
+# Определение состояний
+START, INGREDIENTS, STYLE, GENERATING_RECIPE, GENERATING_SPEECH = range(5)
 
-# Стили
-STYLES = {
-    "1": "стиль космического ужаса",
-    "2": "гопническо-быдляцкий жаргон",
-    "3": "экспериментальный стиль",
-    "4": "классический стиль"
-}
+# Загрузка переменных окружения
+load_dotenv()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-class CocktailBot:
-    def __init__(self):
-        self.recipe_finder = RecipeFinder()
-        self.speech_generator = SpeechGenerator()
-        
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /start"""
-        context.user_data['ingredients'] = []
-        
-        await update.message.reply_text(
-            "Привет! Я помогу найти рецепт коктейля.\n"
-            "Введите первый ингредиент:"
+class BotState:
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            try:
+                cls._instance.recipe_finder = RecipeFinder()
+                cls._instance.speech_generator = SpeechGenerator()
+            except Exception as e:
+                logger.error(f"Ошибка инициализации: {str(e)}")
+                raise RuntimeError("Не удалось инициализировать компоненты бота. Проверьте наличие необходимых файлов.")
+        return cls._instance
+
+    @staticmethod
+    def convert_style(style_code):
+        style_map = {
+            "L": "1",  # Лавкрафт
+            "G": "2",  # Гопник
+            "U": "3",  # Уильям Берроуз
+            "M": "4"   # Минимализм
+        }
+        return style_map.get(style_code, "4")
+
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    keyboard = [[InlineKeyboardButton("Запустить бот", callback_data="start_bot")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(
+        "Привет! Я бот для создания коктейлей. Нажми кнопку ниже, чтобы начать!",
+        reply_markup=reply_markup,
+    )
+    return START
+
+async def handle_ingredients(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    context.user_data.setdefault("ingredients", [])
+    await query.edit_message_text(text="Введите ингредиент:")
+    return INGREDIENTS
+
+async def process_ingredient(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user_data = context.user_data
+    ingredient = update.message.text
+    
+    if len(user_data.get("ingredients", [])) >= 3:
+        await update.message.reply_text("Максимум 3 ингредиента!")
+        return INGREDIENTS
+    
+    user_data.setdefault("ingredients", []).append(ingredient)
+    
+    buttons = []
+    if len(user_data["ingredients"]) < 3:
+        buttons.append(InlineKeyboardButton("Добавить ингредиент", callback_data="add_ingredient"))
+    buttons.append(InlineKeyboardButton("Сгенерировать", callback_data="generate"))
+    
+    keyboard = [buttons]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"Добавлено ингредиентов: {len(user_data['ingredients'])}/3",
+        reply_markup=reply_markup,
+    )
+    return INGREDIENTS
+
+async def select_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    keyboard = [
+        [
+            InlineKeyboardButton("Лавкрафт", callback_data="style_L"),
+            InlineKeyboardButton("Типикал гоп", callback_data="style_G"),
+            InlineKeyboardButton("Берроуз", callback_data="style_U"),
+            InlineKeyboardButton("Меню", callback_data="style_M"),
+        ],
+        [InlineKeyboardButton("Отмена", callback_data="cancel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(text="Выберите стиль:", reply_markup=reply_markup)
+    return STYLE
+
+async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_data = context.user_data
+    
+    await query.edit_message_text(text="Генерация рецепта...⏳")
+    
+    bot_state = BotState()
+    style = bot_state.convert_style(query.data.split("_")[1])
+    recipe = await bot_state.recipe_finder.find_recipe(user_data["ingredients"], style)
+    user_data["recipe"] = recipe
+    user_data["style"] = style  # Сохраняем стиль для генерации речи
+    
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text=f"🍹 Ваш рецепт:\n\n{recipe}"
+    )
+    
+    keyboard = [[InlineKeyboardButton("Запустить синтез речи", callback_data="synthesize")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="Синтезировать аудиоверсию?",
+        reply_markup=reply_markup,
+    )
+    return GENERATING_SPEECH
+
+async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    await query.edit_message_text(text="Синтез речи...⏳")
+    
+    bot_state = BotState()
+    audio_path = await bot_state.speech_generator.generate_speech(
+        context.user_data["recipe"],
+        context.user_data["style"]
+    )
+    
+    with open(audio_path, "rb") as audio_file:
+        await context.bot.send_audio(
+            chat_id=query.message.chat_id,
+            audio=audio_file,
+            title="Рецепт коктейля"
         )
-        return INGREDIENT_INPUT
+    
+    keyboard = [[InlineKeyboardButton("Новый поиск", callback_data="new_search")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await context.bot.send_message(
+        chat_id=query.message.chat_id,
+        text="Что бы вы хотели сделать дальше?",
+        reply_markup=reply_markup,
+    )
+    return START
 
-    async def add_ingredient(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик ввода ингредиента"""
-        ingredient = update.message.text
-        if 'ingredients' not in context.user_data:
-            context.user_data['ingredients'] = []
-        
-        context.user_data['ingredients'].append(ingredient)
-        
-        keyboard = [
-            [
-                InlineKeyboardButton("Добавить ещё", callback_data='more'),
-                InlineKeyboardButton("Готово", callback_data='done')
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            f"Добавлен ингредиент: {ingredient}\n"
-            f"Текущий список: {', '.join(context.user_data['ingredients'])}",
-            reply_markup=reply_markup
-        )
-        return INGREDIENT_INPUT
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data.clear()
+    await query.edit_message_text(text="Действие отменено")
+    return await start_command(update, context)
 
-    async def handle_ingredient_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик выбора действия после ввода ингредиента"""
-        query = update.callback_query
-        await query.answer()
-        
-        if query.data == 'more':
-            await query.edit_message_text("Введите следующий ингредиент:")
-            return INGREDIENT_INPUT
-        
-        elif query.data == 'done':
-            keyboard = [[InlineKeyboardButton(desc, callback_data=str(i))] 
-                       for i, desc in STYLES.items()]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            
-            await query.edit_message_text(
-                "Выберите стиль изложения рецепта:",
-                reply_markup=reply_markup
-            )
-            return STYLE_CHOICE
+async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.clear()
+    return await start_command(update, context)
 
-    async def handle_style_choice(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик выбора стиля"""
-        query = update.callback_query
-        await query.answer()
-        
-        style = query.data
-        context.user_data['style'] = style
-        
-        keyboard = [
-            [
-                InlineKeyboardButton("Генерировать", callback_data='generate'),
-                InlineKeyboardButton("Отмена", callback_data='cancel')
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await query.edit_message_text(
-            f"Выбран стиль: {STYLES[style]}\n"
-            "Начать генерацию?",
-            reply_markup=reply_markup
-        )
-        return GENERATION
+def main() -> None:
+    application = Application.builder().token(TOKEN).build()
 
-    async def generate_recipe(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик генерации рецепта"""
-        query = update.callback_query
-        await query.answer()
-        
-        if query.data == 'cancel':
-            await query.edit_message_text("Генерация отменена. Напишите /start для нового поиска.")
-            return ConversationHandler.END
-        
-        await query.edit_message_text("Генерирую рецепт...")
-        
-        # Получение рецепта
-        ingredients = context.user_data['ingredients']
-        style = context.user_data['style']
-        recipe_text = await self.recipe_finder.find_recipe(ingredients, style)
-        
-        # Генерация аудио
-        audio_path = await self.speech_generator.generate_speech(recipe_text, style)
-        
-        # Отправка результатов
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=recipe_text
-        )
-        
-        if audio_path:
-            with open(audio_path, 'rb') as audio:
-                await context.bot.send_voice(
-                    chat_id=update.effective_chat.id,
-                    voice=audio
-                )
-        
-        return ConversationHandler.END
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start_command)],
+        states={
+            START: [
+                CallbackQueryHandler(handle_ingredients, pattern="^start_bot$"),
+            ],
+            INGREDIENTS: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_ingredient),
+                CallbackQueryHandler(select_style, pattern="^generate$"),
+                CallbackQueryHandler(handle_ingredients, pattern="^add_ingredient$"),
+                CallbackQueryHandler(cancel, pattern="^cancel$"),
+            ],
+            STYLE: [
+                CallbackQueryHandler(generate_recipe, pattern="^style_"),
+                CallbackQueryHandler(cancel, pattern="^cancel$"),
+            ],
+            GENERATING_SPEECH: [
+                CallbackQueryHandler(synthesize_speech, pattern="^synthesize$"),
+                CallbackQueryHandler(cancel, pattern="^cancel$"),
+            ],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
 
-    def run(self):
-        """Запуск бота"""
-        application = Application.builder().token(os.getenv('TELEGRAM_BOT_TOKEN')).build()
-        
-        conv_handler = ConversationHandler(
-            entry_points=[CommandHandler('start', self.start)],
-            states={
-                INGREDIENT_INPUT: [
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, self.add_ingredient),
-                    CallbackQueryHandler(self.handle_ingredient_choice)
-                ],
-                STYLE_CHOICE: [
-                    CallbackQueryHandler(self.handle_style_choice)
-                ],
-                GENERATION: [
-                    CallbackQueryHandler(self.generate_recipe)
-                ]
-            },
-            fallbacks=[CommandHandler('start', self.start)]
-        )
-        
-        application.add_handler(conv_handler)
-        application.run_polling()
+    application.add_handler(conv_handler)
+    application.add_handler(CallbackQueryHandler(new_search, pattern="^new_search$"))
+    
+    application.run_polling()
 
-if __name__ == '__main__':
-    bot = CocktailBot()
-    bot.run() 
+if __name__ == "__main__":
+    main()
