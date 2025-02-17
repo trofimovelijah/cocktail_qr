@@ -68,7 +68,7 @@ async def handle_ingredients(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data.setdefault("ingredients", [])
     
     # Теперь сообщение содержит кнопку для активации ввода 
-    keyboard = [[InlineKeyboardButton("Добавить ингредиент", callback_data="activate_input")]]
+    keyboard = [[InlineKeyboardButton("➕ Добавить ингредиент", callback_data="activate_input")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     await query.edit_message_text(
@@ -81,10 +81,15 @@ async def activate_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     query = update.callback_query
     await query.answer()
     
+    context.user_data["current_state"] = "WAITING_INPUT"  # Устанавливаем текущее состояние
     await query.edit_message_text(text="Теперь введите ингредиент:")
     return "WAITING_INPUT"  # Новое состояние для ожидания ввода
 
 async def process_ingredient(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if context.user_data.get("current_state") != "WAITING_INPUT":
+        await update.message.reply_text("Пожалуйста, нажмите кнопку 'Добавить ингредиент', чтобы ввести ингредиент.")
+        return INGREDIENTS
+
     user_data = context.user_data
     ingredient = update.message.text
     
@@ -96,8 +101,8 @@ async def process_ingredient(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     buttons = []
     if len(user_data["ingredients"]) < 3:
-        buttons.append(InlineKeyboardButton("Добавить ингредиент", callback_data="add_ingredient"))
-    buttons.append(InlineKeyboardButton("Сгенерировать", callback_data="generate"))
+        buttons.append(InlineKeyboardButton("➕ Добавить ингредиент", callback_data="add_ingredient"))
+    buttons.append(InlineKeyboardButton("⚡ Сгенерировать", callback_data="generate"))
     
     keyboard = [buttons]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -112,15 +117,19 @@ async def select_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     query = update.callback_query
     await query.answer()
     
+    # Определяем кнопки с эмодзи
     keyboard = [
         [
-            InlineKeyboardButton("Лавкрафт", callback_data="style_L"),
-            InlineKeyboardButton("Типикал гоп", callback_data="style_G"),
-            InlineKeyboardButton("Берроуз", callback_data="style_U"),
-            InlineKeyboardButton("Меню", callback_data="style_M"),
+            InlineKeyboardButton("👻 Лавкрафт", callback_data="style_L"),
+            InlineKeyboardButton("😎 Типикал гоп", callback_data="style_G"),
+        ],
+        [
+            InlineKeyboardButton("📖 Берроуз", callback_data="style_U"),
+            InlineKeyboardButton("🍹 Меню", callback_data="style_M"),
         ],
         [InlineKeyboardButton("Отмена", callback_data="cancel")]
     ]
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.edit_message_text(text="Выберите стиль:", reply_markup=reply_markup)
     return STYLE
@@ -148,10 +157,12 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             text=f"🍹 Ваш рецепт:\n\n{recipe}"
         )
         
-        keyboard = [[
-            InlineKeyboardButton("Запустить синтез речи", callback_data="synthesize"),
-            InlineKeyboardButton("Новый поиск", callback_data="new_search")
-        ]]
+        keyboard = [
+            [
+                InlineKeyboardButton("🔊 Запустить синтез речи", callback_data="synthesize"),
+                InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")
+            ]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await context.bot.send_message(
             chat_id=query.message.chat_id,
@@ -190,7 +201,7 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Очищаем данные пользователя после синтеза речи
     context.user_data.clear()
     
-    keyboard = [[InlineKeyboardButton("Новый поиск", callback_data="start_bot")]]
+    keyboard = [[InlineKeyboardButton("🔄 Новый поиск", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
         chat_id=query.message.chat_id,
@@ -214,7 +225,7 @@ async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     
     # Создаем кнопку для начала нового поиска
-    keyboard = [[InlineKeyboardButton("Добавить ингредиент", callback_data="add_ingredient")]]
+    keyboard = [[InlineKeyboardButton("➕ Добавить ингредиент", callback_data="add_ingredient")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Отправляем сообщение с кнопкой
@@ -235,6 +246,13 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
             )
     except Exception as e:
         logger.error(f"Ошибка при отправке сообщения об ошибке: {e}")
+
+def create_dynamic_keyboard(buttons):
+    # Разбиваем кнопки на ряды
+    rows = []
+    for i in range(0, len(buttons), 2):  # Два элемента в ряд
+        rows.append(buttons[i:i + 2])
+    return InlineKeyboardMarkup(rows)
 
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
@@ -273,11 +291,8 @@ def main() -> None:
 
     application.add_handler(conv_handler)
     
-    # Добавляем обработку сетевых ошибок
-    try:
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    except Exception as e:
-        logger.error(f"Критическая ошибка при запуске бота: {e}", exc_info=True)
+    # Запуск бота
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
