@@ -187,6 +187,9 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             title="Рецепт коктейля"
         )
     
+    # Очищаем данные пользователя после синтеза речи
+    context.user_data.clear()
+    
     keyboard = [[InlineKeyboardButton("Новый поиск", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
