@@ -1,7 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -10,6 +10,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     filters,
+    CallbackContext
 )
 from recipe_finder import RecipeFinder
 from speech_generator import SpeechGenerator
@@ -21,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Определение состояний
-START, INGREDIENTS, STYLE, GENERATING_RECIPE, GENERATING_SPEECH = range(5)
+START, INGREDIENTS, WAITING_INPUT, STYLE, GENERATING_RECIPE, GENERATING_SPEECH = range(6)
 
 # Загрузка переменных окружения
 load_dotenv()
@@ -65,8 +66,23 @@ async def handle_ingredients(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     
     context.user_data.setdefault("ingredients", [])
-    await query.edit_message_text(text="Введите ингредиент:")
+    
+    # Теперь сообщение содержит кнопку для активации ввода 
+    keyboard = [[InlineKeyboardButton("Добавить ингредиент", callback_data="activate_input")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await query.edit_message_text(
+        text="Нажмите кнопку, чтобы добавить ингредиент:",
+        reply_markup=reply_markup
+    )
     return INGREDIENTS
+
+async def activate_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    await query.edit_message_text(text="Теперь введите ингредиент:")
+    return "WAITING_INPUT"  # Новое состояние для ожидания ввода
 
 async def process_ingredient(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_data = context.user_data
@@ -116,25 +132,41 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     await query.edit_message_text(text="Генерация рецепта...⏳")
     
-    bot_state = BotState()
-    style = bot_state.convert_style(query.data.split("_")[1])
-    recipe = await bot_state.recipe_finder.find_recipe(user_data["ingredients"], style)
-    user_data["recipe"] = recipe
-    user_data["style"] = style  # Сохраняем стиль для генерации речи
-    
-    await context.bot.send_message(
-        chat_id=query.message.chat_id,
-        text=f"🍹 Ваш рецепт:\n\n{recipe}"
-    )
-    
-    keyboard = [[InlineKeyboardButton("Запустить синтез речи", callback_data="synthesize")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await context.bot.send_message(
-        chat_id=query.message.chat_id,
-        text="Синтезировать аудиоверсию?",
-        reply_markup=reply_markup,
-    )
-    return GENERATING_SPEECH
+    try:
+        bot_state = BotState()
+        style = bot_state.convert_style(query.data.split("_")[1])
+        logger.info(f"Попытка генерации рецепта с ингредиентами: {user_data['ingredients']}, стиль: {style}")
+        
+        recipe = await bot_state.recipe_finder.find_recipe(user_data["ingredients"], style)
+        logger.info("Рецепт успешно сгенерирован")
+        
+        user_data["recipe"] = recipe
+        user_data["style"] = style
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"🍹 Ваш рецепт:\n\n{recipe}"
+        )
+        
+        keyboard = [[
+            InlineKeyboardButton("Запустить синтез речи", callback_data="synthesize"),
+            InlineKeyboardButton("Новый поиск", callback_data="new_search")
+        ]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Что бы вы хотели сделать дальше?",
+            reply_markup=reply_markup,
+        )
+        return GENERATING_SPEECH
+        
+    except Exception as e:
+        logger.error(f"Ошибка при генерации рецепта: {str(e)}", exc_info=True)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Произошла ошибка при генерации рецепта. Попробуйте еще раз."
+        )
+        return START
 
 async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
@@ -155,7 +187,7 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             title="Рецепт коктейля"
         )
     
-    keyboard = [[InlineKeyboardButton("Новый поиск", callback_data="new_search")]]
+    keyboard = [[InlineKeyboardButton("Новый поиск", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await context.bot.send_message(
         chat_id=query.message.chat_id,
@@ -172,12 +204,41 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return await start_command(update, context)
 
 async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    # Очищаем данные пользователя
     context.user_data.clear()
-    return await start_command(update, context)
+    
+    # Создаем кнопку для начала нового поиска
+    keyboard = [[InlineKeyboardButton("Добавить ингредиент", callback_data="add_ingredient")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Отправляем сообщение с кнопкой
+    await query.edit_message_text(
+        text="Начнем новый поиск! Нажмите кнопку, чтобы добавить ингредиент.",
+        reply_markup=reply_markup
+    )
+    
+    return INGREDIENTS
+
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logger.error("Произошла ошибка при обработке запроса:", exc_info=context.error)
+    
+    try:
+        if update and update.effective_message:
+            await update.effective_message.reply_text(
+                "Извините, произошла ошибка при обработке вашего запроса. Попробуйте позже."
+            )
+    except Exception as e:
+        logger.error(f"Ошибка при отправке сообщения об ошибке: {e}")
 
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
-
+    
+    # Добавляем обработчик ошибок
+    application.add_error_handler(error_handler)
+    
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start_command)],
         states={
@@ -185,10 +246,14 @@ def main() -> None:
                 CallbackQueryHandler(handle_ingredients, pattern="^start_bot$"),
             ],
             INGREDIENTS: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, process_ingredient),
+                CallbackQueryHandler(activate_input, pattern="^activate_input$"),
                 CallbackQueryHandler(select_style, pattern="^generate$"),
                 CallbackQueryHandler(handle_ingredients, pattern="^add_ingredient$"),
                 CallbackQueryHandler(cancel, pattern="^cancel$"),
+                CallbackQueryHandler(new_search, pattern="^new_search$"),
+            ],
+            "WAITING_INPUT": [  # Новое состояние
+                MessageHandler(filters.TEXT & ~filters.COMMAND, process_ingredient),
             ],
             STYLE: [
                 CallbackQueryHandler(generate_recipe, pattern="^style_"),
@@ -196,6 +261,7 @@ def main() -> None:
             ],
             GENERATING_SPEECH: [
                 CallbackQueryHandler(synthesize_speech, pattern="^synthesize$"),
+                CallbackQueryHandler(new_search, pattern="^new_search$"),
                 CallbackQueryHandler(cancel, pattern="^cancel$"),
             ],
         },
@@ -203,9 +269,12 @@ def main() -> None:
     )
 
     application.add_handler(conv_handler)
-    application.add_handler(CallbackQueryHandler(new_search, pattern="^new_search$"))
     
-    application.run_polling()
+    # Добавляем обработку сетевых ошибок
+    try:
+        application.run_polling(allowed_updates=Update.ALL_TYPES)
+    except Exception as e:
+        logger.error(f"Критическая ошибка при запуске бота: {e}", exc_info=True)
 
 if __name__ == "__main__":
     main()

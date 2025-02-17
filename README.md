@@ -187,5 +187,5 @@ cocktail_qr/
    ```
 4. Запустите бота:   
    ```bash
-   python -m models.telegram_bot   
+   python /models/telegram_bot.py
    ```
