@@ -175,7 +175,7 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.error(f"Ошибка при генерации рецепта: {str(e)}", exc_info=True)
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text="Произошла ошибка при генерации рецепта. Попробуйте еще раз."
+            text="Произошла ошибка при генерации рецепта. Попробуйте еще раз, либо заведите дефект в изъяноотслеживателе https://github.com/trofimovelijah/cocktail_qr/issues/new"
         )
         return START
 
