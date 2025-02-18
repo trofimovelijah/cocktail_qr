@@ -1,3 +1,4 @@
+from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.llms import Ollama
@@ -6,12 +7,15 @@ from langchain.agents import Tool, initialize_agent
 from langchain.chains import RetrievalQA
 import os
 
+load_dotenv()
+hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+
 class RecipeFinder:
     def __init__(self):
         # Инициализация эмбеддингов с новыми параметрами
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-            model_kwargs={"device": "cpu"}#,
+            model_kwargs={"device": "cpu", "token": hf_token}#,
             #encode_kwargs={'normalize_embeddings': True}
         )
         
