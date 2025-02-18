@@ -16,7 +16,9 @@ class SpeechGenerator:
             "1": {"speaker": "aidar", "emotion": "sad"},     # Космический ужас
             "2": {"speaker": "eugene", "emotion": "angry"},   # Гопнический стиль
             "3": {"speaker": "baya", "emotion": "surprise"},  # Экспериментальный
-            "4": {"speaker": "kseniya", "emotion": "neutral"} # По умолчанию
+            "4": {"speaker": "kseniya", "emotion": "neutral"}, # По умолчанию
+            "5": {"speaker": "xenia", "emotion": "neutral"},  # Теорвер
+            "6": {"speaker": "random", "emotion": "sad"}, # Летов            
         }
 
     async def generate_speech(self, text: str, style: str) -> str:

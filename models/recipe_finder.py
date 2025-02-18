@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.llms import Ollama
-from langchain.prompts import PromptTemplate
+from langchain.prompts import ChatPromptTemplate, PromptTemplate
 from langchain.agents import Tool, initialize_agent
 from langchain.chains import RetrievalQA
 import os
@@ -12,11 +12,10 @@ hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 
 class RecipeFinder:
     def __init__(self):
-        # Инициализация эмбеддингов с новыми параметрами
+        # Инициализация эмбеддингов
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-            model_kwargs={"device": "cpu", "token": hf_token}#,
-            #encode_kwargs={'normalize_embeddings': True}
+            model_kwargs={"device": "cpu", "token": hf_token}
         )
         
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -33,29 +32,40 @@ class RecipeFinder:
         self.llm = Ollama(
             base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
             model="mistral:instruct",
-            temperature=0.2,
+            temperature=0.8,
             num_predict=512,
             stop=["\n\n", "###"],
-            top_k=40
+            #top_k=40
         )
         
-        # Настройка ретривера с MMR
+        # Настройка ретривера
         self.retriever = self.db.as_retriever(
             search_type="mmr",
             search_kwargs={"k": 5, "fetch_k": 20}
         )
         
-        # Инициализация цепочки RetrievalQA
-        self.retrieval_qa = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            retriever=self.retriever,
-            return_source_documents=True
-        )
-        
-        # Системный промпт из отладочного кода
-        self.system_prompt = """Ты — помощник для поиска рецептов коктейлей. У тебя есть доступ к базе данных с рецептами, вдохновлёнными литературными произведениями.
+        # Системный промпт
+        self.system_prompt = """Ты — помощник для поиска рецептов коктейлей, знаток классической литературы и просто культурный деятель. 
+        У тебя есть доступ к базе данных с рецептами, вдохновлёнными литературными произведениями. На основе её сгенери рецепт по имеющимся ингредиентам.
         Когда пользователь вводит ингредиенты, используй инструмент "Cocktail Recipe Finder", чтобы найти подходящие рецепты.
-        Если рецепт не найден, предложи альтернативные варианты или уточни запрос."""
+        Если рецепт не найден, предложи альтернативные варианты или уточни запрос.
+        ===
+           
+        Пример:
+        Пользователь: Напиши, какие коктейли можно изготовить из ржаного виски и грейпфрутового сока? Опиши способ приготовления и пропорции. Отвечай на русском, четко и лаконично. 
+        Агент: Использую инструмент "Cocktail Recipe Finder" для поиска рецептов. Вот что найдено: [рецепт].
+
+        ===
+
+        Пример корректного ответа по введённым ингредиентам (ржаной виски, грейпфрутовый сок):
+        Коктейль "Рожь и предубеждение"
+        Состав:
+        - Ржаной виски (50 мл)
+        - Грейпфрутовый сок (90 мл)
+        Способ приготовления:
+        - Ингредиенты выливаем в стакан рокс поверх кубиков льда, размешиваем в ритме «сердце вскачь». 
+        - Хотим подчеркнуть, юные леди, мы нисколечко не предубеждены против замужества, а лишь призываем вас уяснить главное: чтобы почувствовать себя королевой, не нужно и дворца (как, впрочем, и короля).
+        """
 
         # Инициализация агента
         self.agent = initialize_agent(
@@ -68,17 +78,19 @@ class RecipeFinder:
         
         # Стили для преобразования
         self.styles = {
-            "1": "стиль космического ужаса и хтонического мрака Говарда Ф. Лавкрафта",
-            "2": "гопническо-быдляцкий жаргон",
+            "1": "стиль космического ужаса, Иных богов, Некрономикона и хтонического мрака Говарда Ф. Лавкрафта",
+            "2": "урко-гопническо-быдляцкий жаргон",
             "3": "экспериментальный стиль нарезок Уильяма Берроуза",
-            "4": "стиль без изменений"
+            "4": "стиль меню без изменений",
+            "5": "сухое математическое изложение учебника по математической статистике и теории вероятностей с наличием формул",
+            "6": "метафорическая образность песен Егора Летова и Гражданской обороны + немного инвективной и яростной лексики + грязный звук"
         }
 
     def _create_tools(self):
         return [
             Tool(
                 name="Cocktail Recipe Finder",
-                func=self.retrieval_qa.run,
+                func=self.find_recipe,
                 description="Используй для поиска рецептов по ингредиентам. Пример: ['сок', 'виски']."
             )
         ]
@@ -86,19 +98,37 @@ class RecipeFinder:
     async def find_recipe(self, ingredients: list, style: str) -> str:
         # Формирование запроса
         ingredients_str = ", ".join(ingredients)
-        user_prompt = f"""Напиши, какие коктейли можно изготовить из: {ingredients_str}.
-        Опиши способ приготовления и пропорции. Отвечай на русском, четко и лаконично."""
+        user_prompt = f"""Напиши, какой коктейль можно изготовить из представленных ингредиентов.
+            Укажи пропорции каждого ингредиента. 
+            Отвечай строго на русском языке, используя чёткий и лаконичный формат.
+            Не используй повторений.
+            Ингредиенты: {ingredients_str}"""
         
-        # Поиск базового рецепта
-        response = self.retrieval_qa.invoke({"query": user_prompt})
-        original_response = response["result"]
+        # Получение контекста из базы данных
+        docs = self.retriever.invoke(ingredients_str)
+        context = "\n\n".join([d.page_content for d in docs])
+        
+        # Формирование финального промта
+        final_prompt = ChatPromptTemplate.from_template(f"""
+        {self.system_prompt}
+        
+        {context}
+        
+        Задача: {user_prompt}
+        """)
+
+        # Получение текста из final_prompt
+        prompt_text = final_prompt.format()  # Извлекаем текст из шаблона
+
+        # Получение ответа от LLM
+        response = self.llm.invoke(prompt_text)
         
         # Применение стиля
         if style != "4":
-            styled_response = self._apply_style(original_response, style)
+            styled_response = self._apply_style(response, style)
             return self._format_response(styled_response)
         
-        return self._format_response(original_response)
+        return self._format_response(response)
 
     def _apply_style(self, text: str, style: str) -> str:
         style_description = self.styles.get(style, self.styles["4"])

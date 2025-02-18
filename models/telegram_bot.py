@@ -48,7 +48,9 @@ class BotState:
             "L": "1",  # Лавкрафт
             "G": "2",  # Гопник
             "U": "3",  # Уильям Берроуз
-            "M": "4"   # Минимализм
+            "M": "4",   # Минимализм
+            "T": "5",   # Тервер
+            "E": "6"    # Летов
         }
         return style_map.get(style_code, "4")
 
@@ -125,7 +127,11 @@ async def select_style(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         ],
         [
             InlineKeyboardButton("📖 Берроуз", callback_data="style_U"),
-            InlineKeyboardButton("🍹 Меню", callback_data="style_M"),
+            InlineKeyboardButton("📝 Стиль меню", callback_data="style_M"),
+        ],
+        [
+            InlineKeyboardButton("📊 Теорвер и матстат", callback_data="style_T"),
+            InlineKeyboardButton("🎶 ГрОб", callback_data="style_E"),
         ],
         [InlineKeyboardButton("Отмена", callback_data="cancel")]
     ]
