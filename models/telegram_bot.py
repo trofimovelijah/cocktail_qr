@@ -169,22 +169,21 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         user_data["recipe"] = recipe
         user_data["style"] = style
         
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=f"🍹 Ваш рецепт:\n\n{recipe}"
-        )
-        
         keyboard = [
             [
+                InlineKeyboardButton("🍹 Найти рецепт заново", callback_data="regenerate"),
                 InlineKeyboardButton("🔊 Запустить синтез речи", callback_data="synthesize"),
+            ],
+            [
                 InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")
             ]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
+        
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text="Что бы вы хотели сделать дальше?",
-            reply_markup=reply_markup,
+            text=f"🍹 Ваш рецепт:\n\n{recipe}",
+            reply_markup=reply_markup
         )
         return GENERATING_SPEECH
         
@@ -203,6 +202,7 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await query.edit_message_text(text="Синтез речи...⏳")
     
     bot_state = BotState()
+    # Используем последний сгенерированный рецепт
     audio_path = await bot_state.speech_generator.generate_speech(
         context.user_data["recipe"],
         context.user_data["style"]
@@ -218,8 +218,17 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     # Очищаем данные пользователя после синтеза речи
     context.user_data.clear()
     
-    keyboard = [[InlineKeyboardButton("🔄 Новый поиск", callback_data="start_bot")]]
+    keyboard = [
+        [
+            InlineKeyboardButton("🍹 Найти рецепт заново", callback_data="regenerate"),
+            InlineKeyboardButton("🔊 Запустить синтез речи", callback_data="synthesize"),
+        ],
+        [
+            InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")
+        ]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await context.bot.send_message(
         chat_id=query.message.chat_id,
         text="Что бы вы хотели сделать дальше?",
@@ -252,6 +261,64 @@ async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     
     return INGREDIENTS
+
+async def regenerate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    
+    user_data = context.user_data
+    ingredients = user_data.get("ingredients", [])
+    style = user_data.get("style", "4")  # Используем стиль по умолчанию, если не задан
+    
+    if not ingredients or not style:
+        await query.edit_message_text(text="Не удалось найти параметры для перегенерации. Пожалуйста, начните новый поиск.")
+        return START
+    
+    # Генерация нового рецепта
+    await query.edit_message_text(text="Перегенерация рецепта... 🍾🥂")
+    
+    try:
+        bot_state = BotState()
+        recipe = await bot_state.recipe_finder.find_recipe(ingredients, style)
+        
+        user_data["recipe"] = recipe  # Сохраняем новый рецепт
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=f"🍹 Ваш новый рецепт:\n\n{recipe}"
+        )
+        
+        keyboard = [
+            [
+                InlineKeyboardButton("🍹 Найти рецепт заново", callback_data="regenerate"),
+                InlineKeyboardButton("🔊 Запустить синтез речи", callback_data="synthesize"),
+            ],
+            [
+                InlineKeyboardButton("🔄 Новый поиск", callback_data="new_search")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Что бы вы хотели сделать дальше?",
+            reply_markup=reply_markup,
+        )
+        return GENERATING_SPEECH
+        
+    except Exception as e:
+        logger.error(f"Ошибка при перегенерации рецепта: {str(e)}", exc_info=True)
+        await context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text="Произошла ошибка при перегенерации рецепта. Попробуйте еще раз."
+        )
+        return START
+
+# Добавляем обработчик для новой кнопки
+async def handle_regenerate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await regenerate_recipe(update, context)
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     logger.error("Произошла ошибка при обработке запроса:", exc_info=context.error)
@@ -301,6 +368,7 @@ def main() -> None:
                 CallbackQueryHandler(synthesize_speech, pattern="^synthesize$"),
                 CallbackQueryHandler(new_search, pattern="^new_search$"),
                 CallbackQueryHandler(cancel, pattern="^cancel$"),
+                CallbackQueryHandler(handle_regenerate, pattern="^regenerate$"),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
@@ -309,10 +377,6 @@ def main() -> None:
     application.add_handler(conv_handler)
     
     # Запуск бота
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
-
-if __name__ == "__main__":
-    main()
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
