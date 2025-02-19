@@ -2,20 +2,50 @@ from dotenv import load_dotenv
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.llms import Ollama
-from langchain.prompts import ChatPromptTemplate, PromptTemplate
-from langchain.agents import Tool, initialize_agent
+from langchain.prompts import PromptTemplate
 from langchain.chains import RetrievalQA
 import os
 
 load_dotenv()
+
 hf_token = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+
+# 1. Системный промт
+SYSTEM_PROMPT = """
+        Ты — AI-агент, мой помощник для поиска рецептов коктейлей, знаток хорошей литературы и просто культурный деятель.
+        Твоя задача — отвечать на вопросы пользователей, используя только предоставленные рецепты.
+        Если рецепт не найден, предложи рецепт, который возможно приготовить по имеющимся ингредиентам.
+        Отвечай чётко и по делу, но сохраняй культурную точность.
+        ===
+        Пример корректного ответа по введённым ингредиентам (ржаной виски, грейпфрутовый сок):
+        Коктейль "Рожь и предубеждение"
+        Состав:
+        - Ржаной виски (50 мл)
+        - Грейпфрутовый сок (90 мл)
+        Способ приготовления:
+        - Ингредиенты выливаем в стакан рокс поверх кубиков льда, размешиваем в ритме «сердце вскачь». 
+        - Хотим подчеркнуть, юные леди, мы нисколечко не предубеждены против замужества, а лишь призываем вас уяснить главное: чтобы почувствовать себя королевой, не нужно и дворца (как, впрочем, и короля).
+"""
+
+# 2. Пользовательский промт
+USER_PROMPT_TEMPLATE = """
+Вопрос: {question}
+
+Контекст:
+{context}
+
+На основе контекста ответь на вопрос. Если в контексте ответа нет, предложи свой рецепт, но ориентируйся на имеющиеся ингредиенты и стилистику контекста.
+"""
 
 class RecipeFinder:
     def __init__(self):
         # Инициализация эмбеддингов
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
-            model_kwargs={"device": "cpu", "token": hf_token}
+            model_kwargs={
+                "device": "cpu", 
+                "token": hf_token
+            }
         )
         
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,47 +65,22 @@ class RecipeFinder:
             temperature=0.8,
             num_predict=512,
             stop=["\n\n", "###"],
-            #top_k=40
         )
         
-        # Настройка ретривера
-        self.retriever = self.db.as_retriever(
-            search_type="mmr",
-            search_kwargs={"k": 5, "fetch_k": 20}
-        )
-        
-        # Системный промпт
-        self.system_prompt = """Ты — помощник для поиска рецептов коктейлей, знаток классической литературы и просто культурный деятель. 
-        У тебя есть доступ к базе данных с рецептами, вдохновлёнными литературными произведениями. На основе её сгенери рецепт по имеющимся ингредиентам.
-        Когда пользователь вводит ингредиенты, используй инструмент "Cocktail Recipe Finder", чтобы найти подходящие рецепты.
-        Если рецепт не найден, предложи альтернативные варианты или уточни запрос.
-        ===
-           
-        Пример:
-        Пользователь: Напиши, какие коктейли можно изготовить из ржаного виски и грейпфрутового сока? Опиши способ приготовления и пропорции. Отвечай на русском, четко и лаконично. 
-        Агент: Использую инструмент "Cocktail Recipe Finder" для поиска рецептов. Вот что найдено: [рецепт].
-
-        ===
-
-        Пример корректного ответа по введённым ингредиентам (ржаной виски, грейпфрутовый сок):
-        Коктейль "Рожь и предубеждение"
-        Состав:
-        - Ржаной виски (50 мл)
-        - Грейпфрутовый сок (90 мл)
-        Способ приготовления:
-        - Ингредиенты выливаем в стакан рокс поверх кубиков льда, размешиваем в ритме «сердце вскачь». 
-        - Хотим подчеркнуть, юные леди, мы нисколечко не предубеждены против замужества, а лишь призываем вас уяснить главное: чтобы почувствовать себя королевой, не нужно и дворца (как, впрочем, и короля).
-        """
-
-        # Инициализация агента
-        self.agent = initialize_agent(
-            tools=self._create_tools(),
+        # Инициализация RetrievalQA
+        self.qa_agent = RetrievalQA.from_chain_type(
             llm=self.llm,
-            agent="conversational-react-description",
-            verbose=True,
-            agent_kwargs={'system_message': self.system_prompt}
+            chain_type="stuff",
+            retriever=self.db.as_retriever(search_kwargs={"k": 3, "fetch_k": 20}),
+            chain_type_kwargs={
+                "prompt": PromptTemplate(
+                    input_variables=["question", "context"],
+                    template=USER_PROMPT_TEMPLATE
+                ),
+            },
+            return_source_documents=True
         )
-        
+
         # Стили для преобразования
         self.styles = {
             "1": "стиль космического ужаса, Иных богов, Некрономикона и хтонического мрака Говарда Ф. Лавкрафта",
@@ -86,42 +91,23 @@ class RecipeFinder:
             "6": "метафорическая образность песен Егора Летова и Гражданской обороны + немного инвективной и яростной лексики + грязный звук"
         }
 
-    def _create_tools(self):
-        return [
-            Tool(
-                name="Cocktail Recipe Finder",
-                func=self.find_recipe,
-                description="Используй для поиска рецептов по ингредиентам. Пример: ['сок', 'виски']."
-            )
-        ]
-
     async def find_recipe(self, ingredients: list, style: str) -> str:
         # Формирование запроса
         ingredients_str = ", ".join(ingredients)
-        user_prompt = f"""Напиши, какой коктейль можно изготовить из представленных ингредиентов.
-            Укажи пропорции каждого ингредиента. 
-            Отвечай строго на русском языке, используя чёткий и лаконичный формат.
-            Не используй повторений.
-            Ингредиенты: {ingredients_str}"""
+        user_question = """Напиши, какой коктейль (название) можно изготовить из представленных ингредиентов. 
+        Укажи пропорции каждого ингредиента и способ приготовления. Отвечай строго на русском языке, используя чёткий и лаконичный формат. 
+        Не используй повторений. 
+        Ингредиенты: {ingredients_str}"""
         
         # Получение контекста из базы данных
-        docs = self.retriever.invoke(ingredients_str)
-        context = "\n\n".join([d.page_content for d in docs])
+        result = self.qa_agent({"query": user_question})
+        context = "\n\n".join([d.page_content for d in result["source_documents"]])
         
-        # Формирование финального промта
-        final_prompt = ChatPromptTemplate.from_template(f"""
-        {self.system_prompt}
-        
-        {context}
-        
-        Задача: {user_prompt}
-        """)
-
-        # Получение текста из final_prompt
-        prompt_text = final_prompt.format()  # Извлекаем текст из шаблона
+        # Формирование финального промта с системным промтом
+        final_prompt = f"{SYSTEM_PROMPT}\n\n{context}\n\nЗадача: {user_question}"
 
         # Получение ответа от LLM
-        response = self.llm.invoke(prompt_text)
+        response = self.llm.invoke(final_prompt)
         
         # Применение стиля
         if style != "4":
@@ -157,3 +143,15 @@ class RecipeFinder:
         
         # Ограничение длины ответа
         return response[:1000] if len(response) > 1000 else response
+
+# Пример использования
+if __name__ == "__main__":
+    # Инициализация агента
+    recipe_finder = RecipeFinder()
+    
+    # Пример запроса
+    ingredients = ["ржаной виски", "грейпфрутовый сок"]
+    style = "1"
+    result = recipe_finder.find_recipe(ingredients, style)
+    
+    print("Ответ:", result)

@@ -14,6 +14,7 @@ from telegram.ext import (
 )
 from recipe_finder import RecipeFinder
 from speech_generator import SpeechGenerator
+import asyncio
 
 # Настройка логирования
 logging.basicConfig(
@@ -58,7 +59,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     keyboard = [[InlineKeyboardButton("Запустить бот", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(
-        "Привет! Я бот для создания коктейлей. Нажми кнопку ниже, чтобы начать!",
+        "Привет, ДОРОГОЙ БРАТ! Йа бот для создания коктейлей по мотивам литературных произведений. С моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. Нажми кнопку ниже, чтобы начать!",
         reply_markup=reply_markup,
     )
     return START
@@ -145,7 +146,13 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     user_data = context.user_data
     
-    await query.edit_message_text(text="Генерация рецепта...⏳")
+    # Отправляем сообщение с анимацией
+    progress_message = await query.edit_message_text(text="Генерация рецепта... 🍾🥂")
+    
+    # Динамическая анимация прогресс-бара
+    for i in range(5):  # 5 шагов анимации
+        await asyncio.sleep(0.5)  # Задержка для имитации процесса
+        await query.edit_message_text(text="Генерация рецепта... 🍾🥂" + " " * i + "💧")
     
     try:
         bot_state = BotState()
