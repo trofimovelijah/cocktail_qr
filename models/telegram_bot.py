@@ -56,10 +56,14 @@ class BotState:
         return style_map.get(style_code, "4")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    user = update.effective_user  # Получаем информацию о пользователе
+    first_name = user.first_name if user.first_name else "друг"  # Используем имя или "друг" по умолчанию
+
     keyboard = [[InlineKeyboardButton("Запустить бот", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
+    
     await update.message.reply_text(
-        "Привет, ДОРОГОЙ БРАТ! Йа бот для создания коктейлей по мотивам литературных произведений. С моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. Нажми кнопку ниже, чтобы начать!",
+        f"Привет, {first_name}! \n\nДобро пожаловать в бот создания коктейлей по мотивам литературных произведений. \nС моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. \n\nНажми кнопку ниже, чтобы приступить!",
         reply_markup=reply_markup,
     )
     return START
@@ -305,6 +309,10 @@ def main() -> None:
     application.add_handler(conv_handler)
     
     # Запуск бота
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
     application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
