@@ -56,16 +56,28 @@ class BotState:
         return style_map.get(style_code, "4")
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    logger.info("Команда /start получена")
     user = update.effective_user  # Получаем информацию о пользователе
     first_name = user.first_name if user.first_name else "друг"  # Используем имя или "друг" по умолчанию
 
     keyboard = [[InlineKeyboardButton("Запустить бот", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
+    # Отправляем текст приветствия
     await update.message.reply_text(
         f"Привет, {first_name}! \n\nДобро пожаловать в бот создания коктейлей по мотивам литературных произведений. \nС моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. \n\nНажми кнопку ниже, чтобы приступить!",
         reply_markup=reply_markup,
     )
+    
+    # Отправляем изображение
+    await context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=open('../img/century.jpg', 'rb'),  # Укажите правильный путь к изображению
+        caption="Вот изображение, которое я хотел показать!"
+    )
+    
+    logger.info("Бот запущен и ожидает команды...")
+    
     return START
 
 async def handle_ingredients(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
