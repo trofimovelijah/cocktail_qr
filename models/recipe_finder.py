@@ -41,7 +41,7 @@ class RecipeFinder:
     def __init__(self):
         # Инициализация эмбеддингов
         self.embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+            model_name="cointegrated/LaBSE-en-ru",
             model_kwargs={
                 "device": "cpu", 
                 "token": hf_token
@@ -71,7 +71,12 @@ class RecipeFinder:
         self.qa_agent = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
-            retriever=self.db.as_retriever(search_kwargs={"k": 3, "fetch_k": 20}),
+            retriever=self.db.as_retriever(
+                search_kwargs={
+                    "k": 3, 
+                    "fetch_k": 20
+                               }
+                    ),
             chain_type_kwargs={
                 "prompt": PromptTemplate(
                     input_variables=["question", "context"],
