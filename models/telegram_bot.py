@@ -298,6 +298,9 @@ async def regenerate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         
         user_data["recipe"] = recipe  # Сохраняем новый рецепт
         
+        # Удаляем GIF-файл после завершения генерации
+        await context.bot.delete_message(chat_id=query.message.chat_id, message_id=progress_message.message_id)
+        
         await context.bot.send_message(
             chat_id=query.message.chat_id,
             text=f"🍹 Ваш новый рецепт:\n\n{recipe}"
