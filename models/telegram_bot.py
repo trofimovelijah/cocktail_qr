@@ -285,9 +285,12 @@ async def regenerate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     if not ingredients or not style:
         await query.edit_message_text(text="Не удалось найти параметры для перегенерации. Пожалуйста, начните новый поиск.")
         return START
-    
+
     # Генерация нового рецепта
-    await query.edit_message_text(text="Перегенерация рецепта... 🍾🥂")
+    progress_message = await context.bot.send_animation(
+        chat_id=query.message.chat_id,
+        animation=open('img/nmb.gif', 'rb')  # Путь к GIF-файлу
+    )
     
     try:
         bot_state = BotState()
