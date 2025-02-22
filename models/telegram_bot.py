@@ -161,13 +161,11 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
     user_data = context.user_data
     
-    # Отправляем сообщение с анимацией
-    progress_message = await query.edit_message_text(text="Генерация рецепта... 🍾🥂")
-    
-    # Динамическая анимация прогресс-бара
-    for i in range(5):  # 5 шагов анимации
-        await asyncio.sleep(0.5)  # Задержка для имитации процесса
-        await query.edit_message_text(text="Генерация рецепта... 🍾🥂" + " " * i + "💧")
+    # Отправляем GIF-файл как прогресс-бар
+    progress_message = await context.bot.send_animation(
+        chat_id=query.message.chat_id,
+        animation=open('img/moonshiners.gif', 'rb')  # Путь к GIF-файлу
+    )
     
     try:
         bot_state = BotState()
@@ -179,6 +177,9 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         
         user_data["recipe"] = recipe
         user_data["style"] = style
+        
+        # Удаляем GIF-файл после завершения генерации
+        await context.bot.delete_message(chat_id=query.message.chat_id, message_id=progress_message.message_id)
         
         keyboard = [
             [
@@ -202,7 +203,7 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         logger.error(f"Ошибка при генерации рецепта: {str(e)}", exc_info=True)
         await context.bot.send_message(
             chat_id=query.message.chat_id,
-            text="Произошла ошибка при генерации рецепта. Попробуйте еще раз, либо заведите дефект в изъяноотслеживателе https://github.com/trofimovelijah/cocktail_qr/issues/new"
+            text="Произошла ошибка при генерации рецепта. Попробуйте еще раз, либо заведите дефект в [изъяноотслеживателе](https://github.com/trofimovelijah/cocktail_qr/issues/new)"
         )
         return START
 
