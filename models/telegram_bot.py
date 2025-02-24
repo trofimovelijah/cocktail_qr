@@ -119,7 +119,7 @@ async def process_ingredient(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     buttons = []
     if len(user_data["ingredients"]) < 3:
-        buttons.append(InlineKeyboardButton("➕ Добавить ингредиент", callback_data="add_ingredient"))
+        buttons.append(InlineKeyboardButton("➕ Добавить ингредиент", callback_data="activate_input")) #add_ingredient
     buttons.append(InlineKeyboardButton("⚡ Сгенерировать", callback_data="generate"))
     
     keyboard = [buttons]
@@ -243,7 +243,7 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     
     await context.bot.send_message(
         chat_id=query.message.chat_id,
-        text="Что бы вы хотели сделать дальше?",
+        text="\nЧто бы вы хотели сделать дальше?\n",
         reply_markup=reply_markup,
     )
     return START
@@ -263,7 +263,7 @@ async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     
     # Создаем кнопку для начала нового поиска
-    keyboard = [[InlineKeyboardButton("➕ Добавить ингредиент", callback_data="add_ingredient")]]
+    keyboard = [[InlineKeyboardButton("➕ Добавить ингредиент", callback_data="activate_input")]] #add_ingredient
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Отправляем сообщение с кнопкой
