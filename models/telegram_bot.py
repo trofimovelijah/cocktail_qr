@@ -210,8 +210,8 @@ async def generate_recipe(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    
-    await query.edit_message_text(text="Синтез речи...⏳")
+
+    await query.edit_message_text(text="Синтез речи...⏳")  
     
     bot_state = BotState()
     # Используем последний сгенерированный рецепт
@@ -226,10 +226,11 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
             audio=audio_file,
             title="Рецепт коктейля"
         )
-    
+
+    logger.info("Синтез речи успешно выполнен")    
     # Очищаем данные пользователя после синтеза речи
-    context.user_data.clear()
-    
+    #context.user_data.clear()
+   
     keyboard = [
         [
             InlineKeyboardButton("🍹 Найти рецепт заново", callback_data="regenerate"),
