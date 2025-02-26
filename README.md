@@ -170,6 +170,8 @@ cocktail_qr/
 2. [~~Дублирующие кнопки добавления ингредиентов~~](https://github.com/trofimovelijah/cocktail_qr/issues/11)
 3. [~~Не отображается первый (до перегенерации) сгенерированный рецепт~~](https://github.com/trofimovelijah/cocktail_qr/issues/10) - исправлено в ходе решения #21
 4. [~~Не исчезает прогресс-бар после перегенерации рецепта~~](https://github.com/trofimovelijah/cocktail_qr/issues/22)
+5. [Кнопки остаются активными после начала диалога](https://github.com/trofimovelijah/cocktail_qr/issues/23)
+6. [Не отрабатывает повторный запуск команды](https://github.com/trofimovelijah/cocktail_qr/issues/24)
 
 ## 📋 Бэклог
 1. 🔍 Точный поиск по ингредиентам
