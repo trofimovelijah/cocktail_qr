@@ -172,6 +172,7 @@ cocktail_qr/
 4. [~~Не исчезает прогресс-бар после перегенерации рецепта~~](https://github.com/trofimovelijah/cocktail_qr/issues/22)
 5. [Кнопки остаются активными после начала диалога](https://github.com/trofimovelijah/cocktail_qr/issues/23)
 6. [Не отрабатывает повторный запуск команды](https://github.com/trofimovelijah/cocktail_qr/issues/24)
+7. [Ошибка при нажатии кнопки отмены](https://github.com/trofimovelijah/cocktail_qr/issues/25)
 
 ## 📋 Бэклог
 1. 🔍 Точный поиск по ингредиентам
