@@ -166,13 +166,13 @@ cocktail_qr/
 11. 🛠️ [~~Модификация окна приветствия~~](https://github.com/trofimovelijah/cocktail_qr/issues/16)
 
 ### Актуальные дефекты
-1. [После синтеза речи не отвечают другие кнопки](https://github.com/trofimovelijah/cocktail_qr/issues/20) (временное решение - **перезапуск бота**)
-2. [~~Дублирующие кнопки добавления ингредиентов~~](https://github.com/trofimovelijah/cocktail_qr/issues/11)
-3. [~~Не отображается первый (до перегенерации) сгенерированный рецепт~~](https://github.com/trofimovelijah/cocktail_qr/issues/10) - исправлено в ходе решения #21
-4. [~~Не исчезает прогресс-бар после перегенерации рецепта~~](https://github.com/trofimovelijah/cocktail_qr/issues/22)
-5. [Кнопки остаются активными после начала диалога](https://github.com/trofimovelijah/cocktail_qr/issues/23)
-6. [Не отрабатывает повторный запуск команды](https://github.com/trofimovelijah/cocktail_qr/issues/24)
-7. [Ошибка при нажатии кнопки отмены](https://github.com/trofimovelijah/cocktail_qr/issues/25)
+1. [Кнопки остаются активными после начала диалога](https://github.com/trofimovelijah/cocktail_qr/issues/23)
+2. [~~После синтеза речи не отвечают другие кнопки~~](https://github.com/trofimovelijah/cocktail_qr/issues/20) (временное решение - **перезапуск бота**)
+3. [~~Дублирующие кнопки добавления ингредиентов~~](https://github.com/trofimovelijah/cocktail_qr/issues/11)
+4. [~~Не отображается первый (до перегенерации) сгенерированный рецепт~~](https://github.com/trofimovelijah/cocktail_qr/issues/10) - исправлено в ходе решения [#21](https://github.com/trofimovelijah/cocktail_qr/issues/21)
+5. [~~Не исчезает прогресс-бар после перегенерации рецепта~~](https://github.com/trofimovelijah/cocktail_qr/issues/22)
+6. [~~Не отрабатывает повторный запуск команды~~](https://github.com/trofimovelijah/cocktail_qr/issues/24)
+7. [~~Ошибка при нажатии кнопки отмены~~](https://github.com/trofimovelijah/cocktail_qr/issues/25)
 
 ## 📋 Бэклог
 1. 🔍 Точный поиск по ингредиентам
