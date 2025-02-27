@@ -247,7 +247,7 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         text="\nЧто бы вы хотели сделать дальше?\n",
         reply_markup=reply_markup,
     )
-    return START
+    return GENERATING_SPEECH
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
