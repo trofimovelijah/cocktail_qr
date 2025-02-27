@@ -63,15 +63,21 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     keyboard = [[InlineKeyboardButton("Запустить бот", callback_data="start_bot")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
+    if update.message:
+        chat_id = update.message.chat_id
+    else:
+        chat_id = update.effective_chat.id  # На случай, если вызов из callback
+
     # Отправляем изображение
     await context.bot.send_photo(
-        chat_id=update.effective_chat.id,
+        chat_id=chat_id, #update.effective_chat.id,
         photo=open('img/century.jpg', 'rb')  # Путь к изображению
     )
 
     # Отправляем текст приветствия
-    await update.message.reply_text(
-        f"Привет, {first_name}! \n\nДобро пожаловать в бот создания коктейлей по мотивам литературных произведений. \nС моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. \n\nЭкспериментируй, но помни.\nЗа качество и возможность употребления коктейлей ответственность несёшь только ТЫ! \n\nНажми кнопку ниже, чтобы приступить!",
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"Привет, {first_name}! \n\nДобро пожаловать в бот создания коктейлей по мотивам литературных произведений. \nС моей помощью ты сможешь найти, что можно придумать из имеющихся у тебя вкусностей. \n\nЭкспериментируй, но помни.\nЗа качество и возможность употребления коктейлей ответственность несёшь только ТЫ! \n\nНажми кнопку ниже, чтобы приступить!",
         reply_markup=reply_markup,
     )
     
@@ -252,9 +258,27 @@ async def synthesize_speech(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    context.user_data.clear()
-    await query.edit_message_text(text="Действие отменено")
-    return await start_command(update, context)
+
+    # Очищаем только текущий процесс, но оставляем ингредиенты
+    context.user_data.pop("current_state", None)
+
+    # Проверяем, есть ли уже добавленные ингредиенты
+    if context.user_data.get("ingredients"):
+        text = "Вы вернулись. Хотите добавить еще ингредиент или сразу сгенерировать рецепт?"
+        buttons = [
+            InlineKeyboardButton("➕ Добавить ингредиент", callback_data="activate_input"),
+            InlineKeyboardButton("⚡ Сгенерировать", callback_data="generate")
+        ]
+    else:
+        text = "Добавьте первый ингредиент:"
+        buttons = [InlineKeyboardButton("➕ Добавить ингредиент", callback_data="activate_input")]
+
+    reply_markup = InlineKeyboardMarkup([buttons])
+
+    await query.edit_message_text(text=text, reply_markup=reply_markup)
+
+    return INGREDIENTS
+
 
 async def new_search(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
