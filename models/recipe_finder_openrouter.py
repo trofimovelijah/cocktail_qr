@@ -10,7 +10,7 @@ import requests
 import logging
 import json
 from fenya_vocab import fenya
-
+ 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
