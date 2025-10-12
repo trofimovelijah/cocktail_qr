@@ -28,6 +28,7 @@
 ### 🛠️ Технические возможности
 1. 🧪 Тестирование различных моделей:
    - 🔹 проприетарный [OpenAI](/debug/debug_chatgpt.ipynb) (`gpt-3.5-turbo` / `gpt-4o-mini`)
+   - 🔹 моднейший API-шлюз [OpenRouter](models/recipe_finder_openrouter.py)
    - 🔹 моднейший [deepseek-llm-7b-chat](/debug/debug_deepseek.ipynb)
    - 🔹 с открытым кодом [mistral-7B-instruct-v0.3](/debug/debug_mistral.ipynb)
 2. 🎙️ Тестирование синтеза речи:
@@ -55,7 +56,8 @@
 2. Создайте файл `.env` с ключами `HUGGINGFACEHUB_API_TOKEN` и `TELEGRAM_BOT_TOKEN`:
    ```
     - HUGGINGFACEHUB_API_TOKEN = ключ
-    - TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_BOT_TOKEN_HERE
+    - TELEGRAM_BOT_TOKEN = YOUR_TELEGRAM_BOT_TOKEN_HERE
+    - OPENROUTER_API_KEY = ключ
     # опционально (в перспективе)
     - SBER_API_KEY = ключ_авторизации
     - OPENAI_API_KEY = ключ
@@ -84,10 +86,12 @@
    ```bash
    ollama run mistral:instruct   
    ```
-5. Запустите бота:   
+5. Ежели хотите использовать `OpenRouter`, тогда используйте `models/recipe_finder_openrouter.py` вместо `models/recipe_finder.py`
+6. Запустите бота:   
    ```bash
    python /models/telegram_bot.py
    ```
+7. Либо соберите образ докера и запускайте его (пока [в работе](https://github.com/trofimovelijah/cocktail_qr/issues/30))
 
 Преимущества этого подхода:
 - 🚀 Более быстрая работа языковой модели
@@ -108,17 +112,19 @@
 cocktail_qr/
 ├── 🐳 Dockerfile
 ├── 🐋 docker-compose.yml
-├── 📋 requirements.txt
+├── 📋 requirements.txt                # Пакетные зависимости приложения
 ├── 🔑 .env
 ├── 📂 models/
-│ ├── 🤖 recipe_finder.py           # Логика поиска рецептов
-│ ├── 🎙️ speech_generator.py        # Логика генерации речи
-│ └── 🤖 telegram_bot.py            # Основной код бота
-├── 💾 data/                        # Векторное хранилище
-├── 📚 docs/                        # Файлы с рецептами
-├── 🖼️ img/                         # Директория со служебными изображениями
-├── 🧪 debug/                       # Тетради-ноутбуки для отладки различных решений
-└── 🎵 audio/                       # Директория для аудиофайлов
+│ ├── 🤖 recipe_finder.py              # Логика поиска рецептов
+│ ├── 🤖 recipe_finder_openrouter.py   # Логика поиска рецептов через OpenRouter
+│ ├── 🎙️ fenya_vocab.py                # Словарь для генерации ответа №2
+│ ├── 🎙️ speech_generator.py           # Логика генерации речи
+│ └── 🤖 telegram_bot.py               # Основной код бота
+├── 💾 data/                           # Векторные хранилища
+├── 📚 docs/                           # Файлы с рецептами
+├── 🖼️ img/                            # Директория со служебными изображениями
+├── 🧪 debug/                          # Тетради-ноутбуки для отладки различных решений
+└── 🎵 audio/                          # Директория для аудиофайлов
 ```
 
 ## ✨ Особенности реализации
@@ -164,6 +170,7 @@ cocktail_qr/
 9. 🍹 [Переделка бизнес-логики формирования рецептов](https://github.com/trofimovelijah/cocktail_qr/issues/5) с возможностью на выбор писателя, а не ингредиента
 10. 📜 [Логирование кода](https://github.com/trofimovelijah/cocktail_qr/issues/17)
 11. 🛠️ [~~Модификация окна приветствия~~](https://github.com/trofimovelijah/cocktail_qr/issues/16)
+12. [Контейнеризация запуска бота](https://github.com/trofimovelijah/cocktail_qr/issues/30)
 
 ### Актуальные дефекты
 1. [Кнопки остаются активными после начала диалога](https://github.com/trofimovelijah/cocktail_qr/issues/23)
