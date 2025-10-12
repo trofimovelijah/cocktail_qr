@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-class RecipeFinderOpenRouter:
+# только для OpenRouter
+class RecipeFinder:
     """
     Упрощенная версия RecipeFinder с OpenRouter вместо локального Ollama
     """
